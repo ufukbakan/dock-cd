@@ -1,7 +1,7 @@
 import { schema } from "bootpress/helpers";
 
 export const pipelineRequestDto = schema({
-    container: "string",
+    image: "string",
     commands: "string"
 });
 
