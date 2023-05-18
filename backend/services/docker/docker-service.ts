@@ -2,9 +2,10 @@ import { RestService } from "bootpress";
 import { PipelineRequest } from "./dtos";
 import Docker from "dockerode";
 import { config } from "dotenv";
-import tar from "tar";
 import path from "path";
+import shell from "shelljs";
 import { dockerEvents } from "./docker-analytics";
+import { HttpError } from "bootpress/types";
 config();
 
 const {
@@ -37,6 +38,18 @@ class DockerService {
                 })
                 await container.start();
                 dockerEvents.emit("start", container.id);
+                if (!shell.which("git")) {
+                    throw new HttpError(500, "Git is not installed");
+                }
+                const containerFolder = path.resolve("/shared", container.id);
+                const task = shell.exec(`sudo git clone ${pipelineRequest.repo} ${containerFolder}`);
+                if (task.code !== 0) {
+                    reject(`Could'nt clone git repository [${container.id}]`);
+                }
+                const commandFile = path.resolve("/shared", pipelineRequest.command);
+                const ex = await container.exec({ Cmd: [commandFile], Tty: false, Privileged: true });
+                await ex.start({});
+
                 resolve(null);
             }
             catch (e) {
