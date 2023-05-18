@@ -4,6 +4,7 @@ import Docker from "dockerode";
 import { config } from "dotenv";
 import tar from "tar";
 import path from "path";
+import { dockerEvents } from "./docker-analytics";
 config();
 
 const {
@@ -16,11 +17,12 @@ const docker = new Docker({ host: DOCKER_HOST, port: DOCKER_PORT });
 class DockerService {
     runPipeline(pipelineRequest: PipelineRequest) {
         const image = pipelineRequest.image;
-        let clonePath = path.resolve(process.cwd(), "cloned");
+        // let clonePath = path.resolve(process.cwd(), "cloned");
+        // console.log(`clone path:${clonePath}`);
 
         return new Promise(async (resolve, reject) => {
             try {
-                this.#prepareImage(image);
+                await this.#prepareImage(image);
                 const container = await docker.createContainer({
                     Image: image,
                     AttachStdin: false,
@@ -29,17 +31,12 @@ class DockerService {
                     OpenStdin: false,
                     StdinOnce: false,
                     HostConfig: {
-                        Mounts: [{
-                            Source: clonePath,
-                            Target: "/cloned",
-                            Type: "bind"
-                        }]
+                        Binds: ["shared_volume:/shared"]
                     },
-                    Cmd: ["tail", "-f", "/dev/null"],
-                    Tty: false
+                    Tty: true
                 })
                 await container.start();
-                console.log("container is started");
+                dockerEvents.emit("start", container.id);
                 resolve(null);
             }
             catch (e) {
